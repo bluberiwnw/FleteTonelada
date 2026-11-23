@@ -1,0 +1,14 @@
+# Configuración privada
+/config/db.php
+.env
+.env.*
+
+# Dependencias
+/vendor/
+
+# Registros
+*.log
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
