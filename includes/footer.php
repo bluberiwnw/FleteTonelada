@@ -1,54 +1,24 @@
 <footer class="site-footer">
-
-    <div class="container footer-content">
-
+    <div class="container footer-main">
         <div>
-            <a href="<?= RUTA_BASE ?>/" class="brand footer-brand">
-                <span class="brand-icon">FT</span>
-
-                <span class="brand-name">
-                    Flete<span>Tonelada</span>
-                </span>
+            <a class="brand footer-brand" href="<?= RUTA_BASE ?>/">
+                <span class="brand-mark">FT</span>
+                <span class="brand-copy">Flete<span>Tonelada</span></span>
             </a>
-
-            <p>
-                Conectamos empresas y transportistas
-                para facilitar el movimiento de carga pesada.
-            </p>
+            <p>Conectamos empresas que necesitan mover carga pesada con transportistas independientes.</p>
         </div>
-
         <div class="footer-links">
-
-            <a href="<?= RUTA_BASE ?>/#como-funciona">
-                Cómo funciona
-            </a>
-
-            <a href="<?= RUTA_BASE ?>/auth/login.php">
-                Iniciar sesión
-            </a>
-
-            <a href="<?= RUTA_BASE ?>/auth/registro.php">
-                Registrarse
-            </a>
-
+            <a href="<?= RUTA_BASE ?>/#como-funciona">Cómo funciona</a>
+            <a href="<?= RUTA_BASE ?>/auth/login.php">Iniciar sesión</a>
+            <a href="<?= RUTA_BASE ?>/auth/registro.php">Crear cuenta</a>
         </div>
-
     </div>
-
     <div class="container footer-bottom">
-
-        <p>
-            &copy; <?= date('Y') ?> FleteTonelada.
-            Todos los derechos reservados.
-        </p>
-
-        <span>Proyecto académico - MVP</span>
-
+        <span>&copy; <?= date('Y') ?> FleteTonelada. Proyecto académico.</span>
+        <span>Pagos demostrativos; no se procesan transacciones reales.</span>
     </div>
-
 </footer>
-
 <script src="<?= RUTA_BASE ?>/assets/js/menu.js" defer></script>
-
+<script src="<?= RUTA_BASE ?>/assets/js/validaciones.js" defer></script>
 </body>
 </html>

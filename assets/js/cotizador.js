@@ -1,142 +1,83 @@
 const formularioCotizador = document.getElementById('cotizador-form');
 
 if (formularioCotizador) {
-
     const mensaje = document.getElementById('cotizador-mensaje');
-
     const distancia = document.getElementById('resultado-distancia');
-
     const precio = document.getElementById('resultado-precio');
-
     const comision = document.getElementById('resultado-comision');
-
-    const pagoTransportista = document.getElementById(
-        'resultado-transportista'
-    );
-
+    const pago = document.getElementById('resultado-transportista');
     const boton = document.getElementById('cotizar-button');
+    const origenSelect = document.getElementById('origen_id');
+    const destinoSelect = document.getElementById('destino_id');
+    const unidadSelect = document.getElementById('tipo_unidad_id');
+    const pesoInput = document.getElementById('peso_ton');
+    const regresoInput = formularioCotizador.querySelector('[name="es_regreso"]');
+    const moneda = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' });
 
-    let temporizador = null;
+    function limpiarResultado(texto) {
+        mensaje.textContent = texto;
+        distancia.textContent = '— km';
+        precio.textContent = '—';
+        comision.textContent = '—';
+        pago.textContent = '—';
+    }
 
-    let numeroSolicitud = 0;
-
-    const formatoMoneda = new Intl.NumberFormat('es-MX', {
-        style: 'currency',
-        currency: 'MXN'
-    });
-
-    async function calcularCotizacion() {
-
-        if (!formularioCotizador.reportValidity()) {
+    function calcularPrecioLocal() {
+        if (!origenSelect.value || !destinoSelect.value || !unidadSelect.value || !pesoInput.value) {
+            limpiarResultado('Completa los datos del transporte para calcular el precio.');
             return;
         }
 
-        const solicitudActual = ++numeroSolicitud;
+        const origen = origenSelect.selectedOptions[0];
+        const destino = destinoSelect.selectedOptions[0];
+        const unidad = unidadSelect.selectedOptions[0];
+        const peso = Number(pesoInput.value);
+        const capacidad = Number(unidad.dataset.capacidad);
 
-        boton.disabled = true;
-        boton.textContent = 'Calculando...';
-
-        mensaje.textContent = 'Calculando tu cotización...';
-
-        try {
-
-            const respuesta = await fetch(formularioCotizador.action, {
-                method: 'POST',
-                body: new FormData(formularioCotizador),
-                headers: {
-                    'Accept': 'application/json'
-                }
-            });
-
-            const datos = await respuesta.json();
-
-            if (solicitudActual !== numeroSolicitud) {
-                return;
-            }
-
-            if (!respuesta.ok || !datos.ok) {
-
-                throw new Error(
-                    datos.mensaje || 'No fue posible calcular el precio.'
-                );
-
-            }
-
-            distancia.textContent = `${datos.distancia_km} km`;
-
-            precio.textContent = formatoMoneda.format(datos.precio_total);
-
-            comision.textContent = formatoMoneda.format(datos.comision);
-
-            pagoTransportista.textContent = formatoMoneda.format(
-                datos.pago_transportista
-            );
-
-            mensaje.textContent =
-                `Cotización calculada para una unidad ${datos.unidad}.`;
-
-        } catch (error) {
-
-            if (solicitudActual !== numeroSolicitud) {
-                return;
-            }
-
-            mensaje.textContent = error.message;
-
-            distancia.textContent = '-- km';
-            precio.textContent = '--';
-            comision.textContent = '--';
-            pagoTransportista.textContent = '--';
-
-        } finally {
-
-            if (solicitudActual === numeroSolicitud) {
-
-                boton.disabled = false;
-                boton.textContent = 'Calcular cotización';
-
-            }
-
+        if (origen.value === destino.value) {
+            limpiarResultado('El origen y el destino deben ser diferentes.');
+            return;
+        }
+        if (!Number.isFinite(peso) || peso <= 0 || peso > capacidad) {
+            limpiarResultado(`El peso debe ser mayor que cero y no superar ${capacidad} toneladas.`);
+            return;
         }
 
+        const rad = grados => grados * Math.PI / 180;
+        const radioTierra = 6371;
+        const latOrigen = rad(Number(origen.dataset.lat));
+        const latDestino = rad(Number(destino.dataset.lat));
+        const diferenciaLat = latDestino - latOrigen;
+        const diferenciaLng = rad(Number(destino.dataset.lng) - Number(origen.dataset.lng));
+        const a = Math.sin(diferenciaLat / 2) ** 2
+            + Math.cos(latOrigen) * Math.cos(latDestino) * Math.sin(diferenciaLng / 2) ** 2;
+        const distanciaLinea = 2 * radioTierra * Math.asin(Math.sqrt(Math.min(1, Math.max(0, a))));
+        const distanciaKm = distanciaLinea * 1.25;
+        const subtotal = Number(unidad.dataset.base) + distanciaKm * Number(unidad.dataset.km);
+        const factorPeso = 1 + 0.20 * (peso / capacidad);
+        const factorRegreso = regresoInput && regresoInput.checked ? 0.80 : 1;
+        const precioTotal = subtotal * factorPeso * factorRegreso;
+        const comisionTotal = precioTotal * 0.10;
+        const pagoTransportista = precioTotal - comisionTotal;
+
+        distancia.textContent = `${distanciaKm.toFixed(2)} km`;
+        precio.textContent = moneda.format(precioTotal);
+        comision.textContent = moneda.format(comisionTotal);
+        pago.textContent = moneda.format(pagoTransportista);
+        mensaje.textContent = `Estimación calculada en tu navegador para ${unidad.textContent.trim()}. El servidor volverá a calcular el precio al publicar.`;
     }
 
-    formularioCotizador.addEventListener('submit', event => {
-
-        event.preventDefault();
-
-        clearTimeout(temporizador);
-
-        calcularCotizacion();
-
+    formularioCotizador.addEventListener('submit', (evento) => {
+        evento.preventDefault();
+        if (!formularioCotizador.reportValidity()) return;
+        calcularPrecioLocal();
+        if (mensaje.textContent.startsWith('El origen') || mensaje.textContent.startsWith('El peso')) return;
+        boton.textContent = 'Cotización calculada';
+        window.setTimeout(() => { boton.textContent = 'Calcular cotización'; }, 1600);
     });
 
-    formularioCotizador.querySelectorAll(
-        'input, select'
-    ).forEach(campo => {
-
-        campo.addEventListener('change', () => {
-
-            clearTimeout(temporizador);
-
-            const origen = document.getElementById('origen_id').value;
-
-            const destino = document.getElementById('destino_id').value;
-
-            const unidad = document.getElementById('tipo_unidad_id').value;
-
-            const peso = document.getElementById('peso_ton').value;
-
-            if (!origen || !destino || !unidad || !peso) {
-                return;
-            }
-
-            temporizador = setTimeout(() => {
-                calcularCotizacion();
-            }, 500);
-
-        });
-
+    formularioCotizador.querySelectorAll('input, select').forEach((campo) => {
+        campo.addEventListener('input', calcularPrecioLocal);
+        campo.addEventListener('change', calcularPrecioLocal);
     });
-
 }
