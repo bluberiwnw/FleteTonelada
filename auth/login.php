@@ -12,190 +12,70 @@ if (usuarioAutenticado()) {
 $errores = [];
 $email = '';
 
-$mensajeRegistro = ($_GET['registro'] ?? '') === 'correcto';
-$mensajeSalida = ($_GET['salida'] ?? '') === 'correcta';
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     validarTokenCsrf();
-
-    $email = trim(
-        is_string($_POST['email'] ?? null)
-            ? $_POST['email']
-            : ''
-    );
-
-    $contrasena = is_string($_POST['contrasena'] ?? null)
-        ? $_POST['contrasena']
-        : '';
+    $email = trim(is_string($_POST['email'] ?? null) ? $_POST['email'] : '');
+    $contrasena = is_string($_POST['contrasena'] ?? null) ? $_POST['contrasena'] : '';
 
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $errores[] = 'Ingresa un correo electrónico válido.';
     }
-
     if ($contrasena === '') {
         $errores[] = 'Ingresa tu contraseña.';
     }
 
-    if (empty($errores)) {
-
+    if (!$errores) {
         try {
-
             $consulta = $pdo->prepare(
-                "SELECT id, nombre, email, password_hash, rol, verificado, activo
-                 FROM usuarios
-                 WHERE email = :email
-                 LIMIT 1"
+                'SELECT id, nombre, email, password_hash, rol, verificado, activo FROM usuarios WHERE email = :email LIMIT 1'
             );
-
-            $consulta->execute([
-                ':email' => $email
-            ]);
-
+            $consulta->execute([':email' => $email]);
             $usuario = $consulta->fetch();
 
-            if (
-                !$usuario ||
-                !(int) $usuario['activo'] ||
-                !password_verify($contrasena, $usuario['password_hash'])
-            ) {
-
+            if (!$usuario || !(int) $usuario['activo'] || !password_verify($contrasena, $usuario['password_hash'])) {
                 $errores[] = 'Correo electrónico o contraseña incorrectos.';
-
             } else {
+                if (password_needs_rehash($usuario['password_hash'], PASSWORD_DEFAULT)) {
+                    $nuevoHash = password_hash($contrasena, PASSWORD_DEFAULT);
+                    $actualizar = $pdo->prepare('UPDATE usuarios SET password_hash = :hash WHERE id = :id');
+                    $actualizar->execute([':hash' => $nuevoHash, ':id' => $usuario['id']]);
+                }
 
                 session_regenerate_id(true);
-
                 $_SESSION['usuario'] = [
                     'id' => (int) $usuario['id'],
                     'nombre' => $usuario['nombre'],
                     'email' => $usuario['email'],
                     'rol' => $usuario['rol'],
-                    'verificado' => (bool) $usuario['verificado']
+                    'verificado' => (bool) $usuario['verificado'],
                 ];
-
                 unset($_SESSION['token_csrf']);
-
                 obtenerTokenCsrf();
-
                 redirigirSegunRol();
             }
-
         } catch (PDOException $e) {
-
-            error_log('Error en inicio de sesión: ' . $e->getMessage());
-
+            error_log('Login FleteTonelada: ' . $e->getMessage());
             $errores[] = 'No fue posible iniciar sesión. Inténtalo nuevamente.';
         }
     }
 }
 
-$tokenCsrf = obtenerTokenCsrf();
-
+$tituloPagina = 'Iniciar sesión | FleteTonelada';
+require_once __DIR__ . '/../includes/header.php';
 ?>
-
-<!DOCTYPE html>
-<html lang="es">
-
-<head>
-<link rel="stylesheet" href="/fletetonelada/assets/css/base.css">
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>Iniciar sesión | FleteTonelada</title>
-</head>
-
-<body>
-
-    <main class="auth-page">
-
+<main class="auth-layout" id="contenido">
+    <section class="auth-card auth-card-narrow">
+        <span class="eyebrow">BIENVENIDO DE NUEVO</span>
         <h1>Iniciar sesión</h1>
-
-        <p>Ingresa tus credenciales para acceder a FleteTonelada.</p>
-
-        <?php if ($mensajeRegistro): ?>
-
-            <p role="status">
-                Tu registro se completó correctamente. Ahora puedes iniciar sesión.
-            </p>
-
-        <?php endif; ?>
-
-        <?php if ($mensajeSalida): ?>
-
-            <p role="status">
-                Has cerrado sesión correctamente.
-            </p>
-
-        <?php endif; ?>
-
-        <?php if (!empty($errores)): ?>
-
-            <div role="alert">
-                <ul>
-                    <?php foreach ($errores as $error): ?>
-                        <li><?= e($error) ?></li>
-                    <?php endforeach; ?>
-                </ul>
-            </div>
-
-        <?php endif; ?>
-
-        <form method="POST">
-
-            <input
-                type="hidden"
-                name="token_csrf"
-                value="<?= e($tokenCsrf) ?>"
-            >
-
-            <div>
-
-                <label for="email">Correo electrónico</label>
-
-                <input
-                    type="email"
-                    id="email"
-                    name="email"
-                    maxlength="190"
-                    autocomplete="email"
-                    required
-                    value="<?= e($email) ?>"
-                >
-
-            </div>
-
-            <div>
-
-                <label for="contrasena">Contraseña</label>
-
-                <input
-                    type="password"
-                    id="contrasena"
-                    name="contrasena"
-                    autocomplete="current-password"
-                    required
-                >
-
-            </div>
-
-            <button type="submit">Iniciar sesión</button>
-
+        <p class="muted">Ingresa tus credenciales para continuar.</p>
+        <?php if ($errores): ?><div class="alert alert-error" role="alert"><ul><?php foreach ($errores as $error): ?><li><?= e($error) ?></li><?php endforeach; ?></ul></div><?php endif; ?>
+        <form method="POST" class="form-stack">
+            <input type="hidden" name="token_csrf" value="<?= e(obtenerTokenCsrf()) ?>">
+            <div class="form-field"><label for="email">Correo electrónico</label><input type="email" id="email" name="email" maxlength="190" autocomplete="username" required value="<?= e($email) ?>"></div>
+            <div class="form-field"><label for="contrasena">Contraseña</label><input type="password" id="contrasena" name="contrasena" autocomplete="current-password" required></div>
+            <button class="button button-primary button-block" type="submit">Entrar a mi cuenta</button>
         </form>
-
-        <p>
-            ¿Todavía no tienes una cuenta?
-            <a href="<?= RUTA_BASE ?>/auth/registro.php">
-                Regístrate aquí
-            </a>
-        </p>
-
-        <a href="<?= RUTA_BASE ?>/">
-            Volver al inicio
-        </a>
-
-    </main>
-
-</body>
-
-</html>
+        <p class="auth-switch">¿No tienes cuenta? <a href="<?= RUTA_BASE ?>/auth/registro.php">Regístrate</a></p>
+    </section>
+</main>
+<?php require_once __DIR__ . '/../includes/footer.php'; ?>
